@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Research Tool</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+      background: #f0f4f8;
+      color: #1e293b;
+      min-height: 100vh;
+      font-size: 15px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    .site-header {
+      background: #0f172a;
+      color: #fff;
+      padding: 0 2rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+    .site-header h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+
+    /* ── Page containers ── */
+    .page { max-width: 860px; margin: 2rem auto; padding: 0 1.25rem; }
+
+    /* ── Card ── */
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 2rem;
+      box-shadow: 0 1px 4px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.05);
+    }
+
+    /* ── Form ── */
+    .api-key-box {
+      background: #f8fafc;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 1.1rem 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .api-key-box small {
+      display: block;
+      margin-top: 0.4rem;
+      color: #64748b;
+      font-size: 0.8rem;
+    }
+    .api-key-box small a { color: #6366f1; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem 1.5rem;
+    }
+    .form-grid .span-2 { grid-column: 1 / -1; }
+
+    .field { display: flex; flex-direction: column; gap: 0.4rem; }
+
+    label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #475569;
+    }
+
+    input[type="text"],
+    input[type="password"],
+    textarea {
+      width: 100%;
+      padding: 0.65rem 0.875rem;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 7px;
+      font-size: 0.9375rem;
+      font-family: inherit;
+      color: #1e293b;
+      background: #fff;
+      transition: border-color .15s;
+      resize: vertical;
+    }
+    input:focus, textarea:focus { outline: none; border-color: #6366f1; }
+
+    textarea { min-height: 90px; }
+
+    .hint { font-size: 0.78rem; color: #94a3b8; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.65rem 1.4rem;
+      border: none;
+      border-radius: 7px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      font-family: inherit;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: #6366f1; color: #fff; }
+    .btn-primary:hover { background: #4f46e5; }
+    .btn-ghost { background: #f1f5f9; color: #475569; }
+    .btn-ghost:hover { background: #e2e8f0; }
+    .btn-sm { padding: 0.4rem 0.9rem; font-size: 0.8125rem; }
+
+    .form-footer { margin-top: 1.75rem; display: flex; align-items: center; gap: 1rem; }
+
+    /* ── Error ── */
+    .error-box {
+      margin-top: 1rem;
+      padding: 0.75rem 1rem;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 7px;
+      color: #991b1b;
+      font-size: 0.875rem;
+    }
+
+    /* ── Loading ── */
+    #loading-page .card {
+      text-align: center;
+      padding: 4rem 2rem;
+    }
+    .spinner {
+      width: 44px; height: 44px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1.5rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-page h2 { font-size: 1.1rem; margin-bottom: 0.4rem; }
+    #loading-status { color: #64748b; font-size: 0.9rem; }
+
+    /* ── Results ── */
+    .results-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .results-top h2 { font-size: 1.05rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .results-meta { font-size: 0.8rem; color: #64748b; }
+
+    .table-scroll { overflow-x: auto; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+
+    thead { background: #0f172a; color: #fff; }
+    thead th {
+      padding: 0.75rem 0.875rem;
+      text-align: left;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      white-space: nowrap;
+    }
+
+    tbody tr { border-bottom: 1px solid #f1f5f9; }
+    tbody tr:hover td { background: #f8fafc; }
+
+    td {
+      padding: 0.875rem;
+      vertical-align: top;
+      line-height: 1.55;
+    }
+
+    /* Translation sub-row */
+    tr.translation-row { background: #fafaf9; }
+    tr.translation-row td {
+      padding-top: 0.5rem;
+      padding-bottom: 0.875rem;
+      color: #64748b;
+      font-style: italic;
+    }
+    tr.translation-row td::before {
+      content: 'EN ↳ ';
+      font-style: normal;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #94a3b8;
+      letter-spacing: 0.04em;
+    }
+
+    .col-num  { width: 36px; color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-align: center; }
+    .col-stmt { min-width: 300px; }
+    .col-src  { min-width: 130px; font-weight: 500; white-space: nowrap; }
+    .col-yr   { width: 60px; color: #64748b; white-space: nowrap; }
+    .col-url  { width: 200px; }
+    .col-url a {
+      color: #6366f1;
+      text-decoration: none;
+      font-size: 0.78rem;
+      word-break: break-all;
+    }
+    .col-url a:hover { text-decoration: underline; }
+
+    .badge-lang {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.1rem 0.35rem;
+      border-radius: 4px;
+      background: #ede9fe;
+      color: #5b21b6;
+      margin-right: 0.4rem;
+      vertical-align: middle;
+    }
+
+    .empty-msg { text-align: center; color: #94a3b8; padding: 2.5rem 1rem; }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .span-2 { grid-column: 1; }
+      .card { padding: 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="site-header">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+  </svg>
+  <h1>Market Research Tool</h1>
+</header>
+
+<!-- ═══════════ INPUT PAGE ═══════════ -->
+<div id="input-page" class="page">
+  <div class="card">
+
+    <div class="api-key-box">
+      <div class="field">
+        <label for="api-key">Gemini API Key</label>
+        <input type="password" id="api-key" placeholder="AIza…" autocomplete="off" spellcheck="false">
+      </div>
+      <small>
+        Free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+        Stored only in your browser's localStorage — never sent anywhere except Google's API.
+      </small>
+    </div>
+
+    <div class="form-grid">
+      <div class="field span-2">
+        <label for="topic">Topic Description</label>
+        <textarea id="topic" placeholder="e.g. Electric vehicle adoption rates in European markets 2023–2024"></textarea>
+      </div>
+
+      <div class="field span-2">
+        <label for="questions">Question(s)</label>
+        <textarea id="questions" placeholder="e.g. What share of new car sales are EVs in Norway?&#10;What are the main barriers to EV adoption in Germany?"></textarea>
+      </div>
+
+      <div class="field">
+        <label for="search-lang">Search Language(s)</label>
+        <input type="text" id="search-lang" placeholder="e.g. English, German, French">
+        <span class="hint">Languages to search for sources in</span>
+      </div>
+
+      <div class="field">
+        <label for="output-lang">Output Language(s)</label>
+        <input type="text" id="output-lang" placeholder="e.g. English">
+        <span class="hint">Language for presenting results. Non-English sources always get an English translation.</span>
+      </div>
+    </div>
+
+    <div id="input-error" class="error-box" hidden></div>
+
+    <div class="form-footer">
+      <button class="btn btn-primary" onclick="startResearch()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Start Research
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════ LOADING PAGE ═══════════ -->
+<div id="loading-page" class="page" hidden>
+  <div class="card">
+    <div class="spinner"></div>
+    <h2>Searching the web…</h2>
+    <p id="loading-status">Querying Gemini 2.0 Flash with Google Search grounding</p>
+  </div>
+</div>
+
+<!-- ═══════════ RESULTS PAGE ═══════════ -->
+<div id="results-page" class="page" hidden>
+  <div class="card">
+
+    <div class="results-top">
+      <div>
+        <h2 id="results-title"></h2>
+        <p id="results-meta" class="results-meta"></p>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" onclick="exportCsv()">Export CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="newSearch()">← New Search</button>
+      </div>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th class="col-num">#</th>
+            <th class="col-stmt">Statement from Source (verbatim)</th>
+            <th class="col-src">Source Name</th>
+            <th class="col-yr">Year</th>
+            <th class="col-url">URL</th>
+          </tr>
+        </thead>
+        <tbody id="results-body"></tbody>
+      </table>
+    </div>
+
+    <div id="results-error" class="error-box" hidden></div>
+
+  </div>
+</div>
+
+<script>
+  const GEMINI_MODEL = 'gemini-2.0-flash';
+  const GEMINI_URL   = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+  // ── Persist API key ──────────────────────────────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    const saved = localStorage.getItem('gemini_api_key');
+    if (saved) document.getElementById('api-key').value = saved;
+  });
+
+  // ── Page switching ───────────────────────────────────────────────────────────
+  function showPage(id) {
+    ['input-page', 'loading-page', 'results-page'].forEach(p => {
+      document.getElementById(p).hidden = (p !== id);
+    });
+  }
+
+  function newSearch() { showPage('input-page'); }
+
+  function setError(boxId, msg) {
+    const el = document.getElementById(boxId);
+    el.textContent = msg;
+    el.hidden = !msg;
+  }
+
+  // ── Main entry point ─────────────────────────────────────────────────────────
+  async function startResearch() {
+    setError('input-error', '');
+
+    const apiKey     = document.getElementById('api-key').value.trim();
+    const topic      = document.getElementById('topic').value.trim();
+    const questions  = document.getElementById('questions').value.trim();
+    const searchLang = document.getElementById('search-lang').value.trim() || 'English';
+    const outputLang = document.getElementById('output-lang').value.trim() || 'English';
+
+    if (!apiKey)    return setError('input-error', 'Please enter your Gemini API key.');
+    if (!topic)     return setError('input-error', 'Please enter a topic description.');
+    if (!questions) return setError('input-error', 'Please enter at least one question.');
+
+    localStorage.setItem('gemini_api_key', apiKey);
+    showPage('loading-page');
+
+    try {
+      const rows = await runResearch(apiKey, topic, questions, searchLang, outputLang);
+      renderResults(rows, topic, questions);
+    } catch (err) {
+      showPage('input-page');
+      setError('input-error', err.message);
+    }
+  }
+
+  // ── Prompt ───────────────────────────────────────────────────────────────────
+  function buildPrompt(topic, questions, searchLang, outputLang) {
+    return `You are a market research fact-extraction assistant. Search the web and collect verbatim factual statements from real sources.
+
+RESEARCH TOPIC: ${topic}
+
+QUESTIONS TO ADDRESS:
+${questions}
+
+SEARCH LANGUAGES: ${searchLang}
+OUTPUT LANGUAGE: ${outputLang}
+
+RULES — follow these exactly:
+1. Each "statement" must be a VERBATIM copy of text that appears word-for-word in the source. Do not change a single word, fix grammar, or reorder phrases.
+2. Do NOT paraphrase, summarize, interpret, or synthesize.
+3. Do NOT add commentary, analysis, or text of your own anywhere in the output.
+4. Find at least 6 and up to 15 distinct quotes from different sources.
+5. For sources NOT written in English: put the original text in "statement" and an English translation in "english_translation".
+6. For English sources: set "english_translation" to null.
+7. Use the "language" field for the ISO 639-1 code of the SOURCE language (e.g. "en", "de", "fr", "ja", "zh").
+
+Return ONLY a valid JSON array — no markdown fences, no surrounding text — in this exact shape:
+[
+  {
+    "statement": "verbatim text from the source",
+    "source_name": "Publication or website name",
+    "year": "YYYY or n.d.",
+    "url": "https://full-url-to-the-source-page",
+    "language": "ISO 639-1 code",
+    "english_translation": "English translation, or null"
+  }
+]`;
+  }
+
+  // ── API call ─────────────────────────────────────────────────────────────────
+  async function runResearch(apiKey, topic, questions, searchLang, outputLang) {
+    const body = {
+      contents: [{ role: 'user', parts: [{ text: buildPrompt(topic, questions, searchLang, outputLang) }] }],
+      tools: [{ google_search: {} }],
+      generationConfig: { temperature: 0.1 }
+    };
+
+    const resp = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      const msg = err?.error?.message || `API error ${resp.status}`;
+      throw new Error(msg);
+    }
+
+    const data = await resp.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+
+    if (!text) throw new Error('Gemini returned an empty response. Please try again.');
+
+    return parseJson(text);
+  }
+
+  function parseJson(raw) {
+    const attempts = [
+      () => JSON.parse(raw.trim()),
+      () => { const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/i); if (m) return JSON.parse(m[1].trim()); throw 0; },
+      () => { const m = raw.match(/(\[[\s\S]*\])/); if (m) return JSON.parse(m[1]); throw 0; }
+    ];
+    for (const fn of attempts) {
+      try { const r = fn(); if (Array.isArray(r)) return r; } catch { /* try next */ }
+    }
+    throw new Error('Could not parse a JSON array from the model response. Try running the search again.');
+  }
+
+  // ── Render results ───────────────────────────────────────────────────────────
+
+  // keep a reference to the last results for CSV export
+  let _lastResults = [];
+
+  function renderResults(rows, topic, questions) {
+    _lastResults = rows;
+
+    document.getElementById('results-title').textContent = topic;
+    document.getElementById('results-meta').textContent =
+      `${rows.length} statement${rows.length !== 1 ? 's' : ''} found  ·  Questions: ${questions}`;
+
+    const tbody = document.getElementById('results-body');
+    tbody.innerHTML = '';
+
+    if (rows.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5" class="empty-msg">No verbatim quotes found. Try different search terms, languages, or a broader topic.</td></tr>`;
+    } else {
+      rows.forEach((item, i) => {
+        const isNonEn = item.language && item.language !== 'en' && item.english_translation;
+        const rowspan = isNonEn ? 2 : 1;
+        const lang    = (item.language || '').toLowerCase();
+
+        // Primary row
+        const tr1 = document.createElement('tr');
+        tr1.innerHTML = `
+          <td class="col-num" rowspan="${rowspan}">${i + 1}</td>
+          <td class="col-stmt">${isNonEn ? `<span class="badge-lang">${h(lang)}</span>` : ''}${h(item.statement || '')}</td>
+          <td class="col-src" rowspan="${rowspan}">${h(item.source_name || 'Unknown')}</td>
+          <td class="col-yr"  rowspan="${rowspan}">${h(item.year || 'n.d.')}</td>
+          <td class="col-url" rowspan="${rowspan}">${item.url ? `<a href="${h(item.url)}" target="_blank" rel="noopener">${h(friendlyUrl(item.url))}</a>` : '—'}</td>`;
+        tbody.appendChild(tr1);
+
+        // English translation sub-row
+        if (isNonEn) {
+          const tr2 = document.createElement('tr');
+          tr2.className = 'translation-row';
+          tr2.innerHTML = `<td class="col-stmt">${h(item.english_translation)}</td>`;
+          tbody.appendChild(tr2);
+        }
+      });
+    }
+
+    setError('results-error', '');
+    showPage('results-page');
+  }
+
+  // ── CSV export ───────────────────────────────────────────────────────────────
+  function exportCsv() {
+    if (!_lastResults.length) return;
+    const cols = ['#', 'Statement', 'English Translation', 'Source Name', 'Year', 'URL', 'Language'];
+    const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [
+      cols.map(escape).join(','),
+      ..._lastResults.map((r, i) => [
+        i + 1,
+        r.statement,
+        r.english_translation ?? '',
+        r.source_name,
+        r.year,
+        r.url,
+        r.language
+      ].map(escape).join(','))
+    ];
+    const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = 'market-research.csv';
+    a.click();
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function h(str) {
+    return String(str ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function friendlyUrl(url) {
+    try {
+      const u = new URL(url);
+      const path = u.pathname.length > 28 ? u.pathname.slice(0, 25) + '…' : u.pathname;
+      return u.hostname + path;
+    } catch {
+      return url.slice(0, 50);
+    }
+  }
+</script>
+
+</body>
+</html>
