@@ -30,6 +30,7 @@
 
     /* ── Page containers ── */
     .page { max-width: 860px; margin: 2rem auto; padding: 0 1.25rem; }
+    #results-page.page { max-width: none; padding: 0 1.5rem; }
 
     /* ── Card ── */
     .card {
@@ -442,15 +443,17 @@
 
     // Detect language and translate if needed
     const rows = await Promise.all(allResults.map(async r => {
-      const lang        = detectLang(r.content || '');
+      const rawContent  = r.content || '';
+      const lang        = detectLang(rawContent);
+      const statement   = extractRelevantSentences(rawContent, topic, questions);
       const needsTrans  = lang !== 'en';
       const translation = needsTrans
-        ? await translateToEnglish(r.content || '', lang).catch(() => null)
+        ? await translateToEnglish(statement, lang).catch(() => null)
         : null;
 
       return {
-        statement:           r.content || '',
-        source_name:         r.title   || 'Unknown',
+        statement,
+        source_name:         r.title || 'Unknown',
         year:                extractYear(r.published_date),
         url:                 r.url,
         language:            lang,
@@ -459,6 +462,46 @@
     }));
 
     return rows.filter(r => r.statement.trim());
+  }
+
+  // ── Sentence extraction (keyword relevance scoring) ─────────────────────────
+  function extractRelevantSentences(content, topic, questions) {
+    // Strip markdown syntax so it doesn't pollute sentence text
+    const clean = content
+      .replace(/\|[^\n]*\|/g, '')           // table rows
+      .replace(/#{1,6}\s+/g, '')            // headings
+      .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1') // links / images
+      .replace(/`[^`]+`/g, '')              // inline code
+      .replace(/[-*_]{2,}/g, '')            // bold/italic/hr markers
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // Split on sentence-ending punctuation followed by whitespace / end
+    const sentences = clean.match(/[^.!?\n]+[.!?]*/g) || [];
+
+    // Build keyword set from topic + questions (words longer than 3 chars)
+    const stopWords = new Set(['that','this','with','from','have','been','will','they','their','also','into','what','when','where','which','were','more','than','some','each','such']);
+    const keywords = [...topic, ...questions]
+      .join(' ')
+      .toLowerCase()
+      .split(/\W+/)
+      .filter(w => w.length > 3 && !stopWords.has(w));
+    const kwSet = new Set(keywords);
+
+    const scored = sentences
+      .map(s => s.trim())
+      .filter(s => s.length > 30)
+      .map(s => {
+        const lower = s.toLowerCase();
+        const score = [...kwSet].reduce((n, kw) => n + (lower.includes(kw) ? 1 : 0), 0);
+        return { text: s, score };
+      });
+
+    scored.sort((a, b) => b.score - a.score);
+
+    const top = scored.slice(0, 2).map(s => s.text).join(' ').trim();
+    // Fallback: first 280 chars if nothing scored
+    return top || clean.slice(0, 280);
   }
 
   // ── Language hint for query ──────────────────────────────────────────────────
