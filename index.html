@@ -188,13 +188,13 @@
       color: #64748b;
       font-style: italic;
     }
-    tr.translation-row td::before {
-      content: 'EN ↳ ';
+    tr.translation-row td .trans-label {
       font-style: normal;
       font-size: 0.7rem;
       font-weight: 600;
       color: #94a3b8;
       letter-spacing: 0.04em;
+      margin-right: 0.25rem;
     }
 
     .col-num  { width: 36px; color: #94a3b8; font-size: 0.75rem; font-weight: 600; text-align: center; }
@@ -373,6 +373,7 @@
     const topic      = document.getElementById('topic').value.trim();
     const questions  = document.getElementById('questions').value.trim();
     const searchLang = document.getElementById('search-lang').value.trim() || 'English';
+    const outputLang = document.getElementById('output-lang').value.trim() || 'English';
 
     if (!apiKey)    return setError('input-error', 'Please enter your Tavily API key.');
     if (!topic)     return setError('input-error', 'Please enter a topic description.');
@@ -382,8 +383,8 @@
     showPage('loading-page');
 
     try {
-      const rows = await runResearch(apiKey, topic, questions, searchLang);
-      renderResults(rows, topic, questions);
+      const rows = await runResearch(apiKey, topic, questions, searchLang, outputLang);
+      renderResults(rows, topic, questions, outputLang);
     } catch (err) {
       showPage('input-page');
       setError('input-error', err.message);
@@ -415,7 +416,7 @@
   }
 
   // ── Research orchestration ───────────────────────────────────────────────────
-  async function runResearch(apiKey, topic, questions, searchLang) {
+  async function runResearch(apiKey, topic, questions, searchLang, outputLang) {
     const questionList = questions.split('\n').map(q => q.trim()).filter(Boolean);
     const langHint     = buildLangHint(searchLang);
 
@@ -442,13 +443,14 @@
       `Processing ${allResults.length} sources…`;
 
     // Detect language and translate if needed
+    const targetLangCode = langNameToCode(outputLang);
     const rows = await Promise.all(allResults.map(async r => {
       const rawContent  = r.content || '';
       const lang        = detectLang(rawContent);
       const statement   = extractRelevantSentences(rawContent, topic, questions);
-      const needsTrans  = lang !== 'en';
+      const needsTrans  = lang !== targetLangCode;
       const translation = needsTrans
-        ? await translateToEnglish(statement, lang).catch(() => null)
+        ? await translateText(statement, lang, targetLangCode).catch(() => null)
         : null;
 
       return {
@@ -523,14 +525,31 @@
     return 'en';
   }
 
+  // ── Language name → ISO 639-1 code ──────────────────────────────────────────
+  function langNameToCode(name) {
+    const map = {
+      english: 'en', estonian: 'et', latvian: 'lv', lithuanian: 'lt',
+      german: 'de', french: 'fr', spanish: 'es', italian: 'it',
+      portuguese: 'pt', dutch: 'nl', swedish: 'sv', norwegian: 'no',
+      danish: 'da', finnish: 'fi', polish: 'pl', czech: 'cs',
+      slovak: 'sk', hungarian: 'hu', romanian: 'ro', bulgarian: 'bg',
+      croatian: 'hr', serbian: 'sr', slovenian: 'sl', ukrainian: 'uk',
+      russian: 'ru', chinese: 'zh', japanese: 'ja', korean: 'ko',
+      arabic: 'ar', thai: 'th', turkish: 'tr', greek: 'el',
+      hebrew: 'he', hindi: 'hi', indonesian: 'id', malay: 'ms',
+      vietnamese: 'vi'
+    };
+    return map[name.toLowerCase().trim()] || 'en';
+  }
+
   // ── Translation via MyMemory (free, no key needed) ───────────────────────────
-  async function translateToEnglish(text, sourceLang) {
-    const snippet = text.slice(0, 450); // stay well within free-tier word limits
-    const url     = `${MYMEMORY_URL}?q=${encodeURIComponent(snippet)}&langpair=${sourceLang}|en`;
+  async function translateText(text, sourceLang, targetLang) {
+    const snippet = text.slice(0, 450);
+    const url     = `${MYMEMORY_URL}?q=${encodeURIComponent(snippet)}&langpair=${sourceLang}|${targetLang}`;
     const resp    = await fetch(url);
     if (!resp.ok) return null;
-    const data        = await resp.json();
-    const translated  = data?.responseData?.translatedText;
+    const data       = await resp.json();
+    const translated = data?.responseData?.translatedText;
     return translated && translated !== snippet ? translated : null;
   }
 
@@ -544,7 +563,7 @@
   // ── Render results ───────────────────────────────────────────────────────────
   let _lastResults = [];
 
-  function renderResults(rows, topic, questions) {
+  function renderResults(rows, topic, questions, outputLang = 'English') {
     _lastResults = rows;
 
     document.getElementById('results-title').textContent = topic;
@@ -557,24 +576,26 @@
     if (rows.length === 0) {
       tbody.innerHTML = `<tr><td colspan="5" class="empty-msg">No results found. Try different search terms or a broader topic.</td></tr>`;
     } else {
+      const targetLangCode = langNameToCode(outputLang);
+      const transLabel     = outputLang.slice(0, 2).toUpperCase();
       rows.forEach((item, i) => {
-        const isNonEn = item.language !== 'en' && item.english_translation;
-        const rowspan = isNonEn ? 2 : 1;
+        const hasTranslation = item.english_translation && item.language !== targetLangCode;
+        const rowspan = hasTranslation ? 2 : 1;
         const lang    = (item.language || 'en').toLowerCase();
 
         const tr1 = document.createElement('tr');
         tr1.innerHTML = `
           <td class="col-num" rowspan="${rowspan}">${i + 1}</td>
-          <td class="col-stmt">${isNonEn ? `<span class="badge-lang">${h(lang)}</span>` : ''}${h(item.statement)}</td>
+          <td class="col-stmt">${hasTranslation ? `<span class="badge-lang">${h(lang)}</span>` : ''}${h(item.statement)}</td>
           <td class="col-src" rowspan="${rowspan}">${h(item.source_name)}</td>
           <td class="col-yr"  rowspan="${rowspan}">${h(item.year)}</td>
           <td class="col-url" rowspan="${rowspan}">${item.url ? `<a href="${h(item.url)}" target="_blank" rel="noopener">${h(friendlyUrl(item.url))}</a>` : '—'}</td>`;
         tbody.appendChild(tr1);
 
-        if (isNonEn) {
+        if (hasTranslation) {
           const tr2 = document.createElement('tr');
           tr2.className = 'translation-row';
-          tr2.innerHTML = `<td class="col-stmt">${h(item.english_translation)}</td>`;
+          tr2.innerHTML = `<td class="col-stmt"><span class="trans-label">${h(transLabel)} ↳</span>${h(item.english_translation)}</td>`;
           tbody.appendChild(tr2);
         }
       });
@@ -587,7 +608,7 @@
   // ── CSV export ───────────────────────────────────────────────────────────────
   function exportCsv() {
     if (!_lastResults.length) return;
-    const cols   = ['#', 'Statement', 'English Translation', 'Source Name', 'Year', 'URL', 'Language'];
+    const cols   = ['#', 'Statement', 'Translation', 'Source Name', 'Year', 'URL', 'Language'];
     const escape = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const lines  = [
       cols.map(escape).join(','),
